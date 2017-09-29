@@ -35,6 +35,7 @@ class LayerConverter(object):
 
         if mask:
             target['mask'] = mask.get_funciri()
+            target['fill'] = 'white'
 
         # Blending options.
         if not layer._info.flags.visible:
@@ -110,7 +111,7 @@ class LayerConverter(object):
             self._current_group.add(vector_stroke)
 
     def _get_target(self, layer):
-        target = None
+        #target = None
         if isinstance(layer, psd_tools.Group):
             # Group.
             current_group = self._current_group
@@ -120,8 +121,20 @@ class LayerConverter(object):
             self._current_group = target
             self._add_group(layer.layers)
             self._current_group = current_group
-        elif isinstance(layer, _VisibleLayer) and (
-            layer.bbox.width > 0 and layer.bbox.height > 0):
+        elif layer.kind == 'shape':
+            blocks = layer._tagged_blocks
+            vsms = blocks.get(b'vsms', blocks.get(b'vmsk'))
+            anchors = [
+                (p['anchor'][1] * self.width,
+                 p['anchor'][0] * self.height)
+                for p in vsms.path if p['selector'] in (1, 2, 4, 5)]
+            fill = self._get_fill(layer)
+            target = self._dwg.polygon(points=anchors, fill=fill)
+            target.set_desc(title=safe_utf8(layer.name))
+        elif isinstance(layer, _VisibleLayer):
+            if not (layer.bbox.width > 0 and layer.bbox.height > 0):
+                logger.warning('invalid bbox {}'.format(layer.bbox))
+
             # Regular pixel layer.
             target = self._dwg.image(
                 self._get_image_href(layer.as_PIL()),
@@ -145,16 +158,6 @@ class LayerConverter(object):
                     container.add(text)
                     container['class'] = 'text-container'
                     target = container
-        elif layer.kind == 'shape':
-            blocks = layer._tagged_blocks
-            vsms = blocks.get(b'vsms', blocks.get(b'vmsk'))
-            anchors = [
-                (p['anchor'][1] * self.width,
-                 p['anchor'][0] * self.height)
-                for p in vsms.path if p['selector'] in (1, 2, 4, 5)]
-            fill = self._get_fill(layer)
-            target = self._dwg.polygon(points=anchors, fill=fill)
-            target.set_desc(title=safe_utf8(layer.name))
         elif any(TaggedBlock.is_fill_key(key) for key in layer._tagged_blocks.keys()):
             record = layer._info
             bbox = BBox(record.left, record.top, record.right, record.bottom)
@@ -191,10 +194,23 @@ class LayerConverter(object):
             size=(default_bbox.width, default_bbox.height),
             fill='rgb({0},{0},{0})'.format(background_color)))
         bbox = mask_data.bbox
+
+
+
+
+
+
         mask.add(self._dwg.image(
             self._get_image_href(mask_data.as_PIL()),
             size=(bbox.width, bbox.height),
             insert=(bbox.x1, bbox.y1)))
+
+
+
+
+
+
+
         mask['color-interpolation'] = 'sRGB'
         return mask
 
