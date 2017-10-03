@@ -96,8 +96,10 @@ class EffectsConverter(object):
 
         # Inner effects.
         if b'IrSh' in effects:
-            effects_group.add(self._add_irsh(
-                effects[b'IrSh'], target.get_iri(), blend_mode))
+            effects_group.inner_shadow = self._add_irsh(
+                effects[b'IrSh'], target.get_iri(), blend_mode)
+            #effects_group.add(self._add_irsh(
+            #    effects[b'IrSh'], target.get_iri(), blend_mode))
         if b'IrGl' in effects:
             effects_group.add(self._add_irgl(
                 effects[b'IrGl'], target.get_iri(), blend_mode))

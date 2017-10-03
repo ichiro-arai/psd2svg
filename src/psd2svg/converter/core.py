@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import, unicode_literals
+
+from collections import namedtuple
+
 from logging import getLogger
 import psd_tools
 from psd_tools import BBox
@@ -13,22 +16,36 @@ from psd2svg.utils.xml import safe_utf8
 logger = getLogger(__name__)
 
 
+ClipContext = namedtuple('ClipContext', 'base_shape inner_shadow path')
+
 class LayerConverter(object):
 
     def _add_group(self, layers):
         for layer in reversed(layers):
-            target = self._add_layer(layer)
-            for clip in reversed(layer.clip_layers):
-                self._add_layer(clip)
+            context = self._add_layer(layer)
+
+
+            for clip_layer in reversed(layer.clip_layers):
+                self._add_layer(clip_layer, context)
+
+            if context and context.inner_shadow:
+                self._current_group.add(context.inner_shadow)
+            if context and context.path:
+                self._current_group.add(context.path)
+
             #if layer.clip_layers and self._clip_group:
             #    clip_path = self._dwg.defs.add(self._dwg.clipPath())
             #    clip_path.add(self._dwg.use(target.get_iri()))
             #    self._clip_group['clip-path'] = clip_path.get_funciri()
 
-    def _add_layer(self, layer):
+    def _add_layer(self, layer, context=None):
         target = self._get_target(layer)
         if target is None:
             return
+
+        if not context:
+            context = ClipContext(target, None, None)
+
 
         target.get_iri()  # Assign id
         mask = self._add_mask_if_exist(layer)
@@ -72,6 +89,14 @@ class LayerConverter(object):
             target = self._add_effects(effects, layer, target, fill_opacity,
                                        interior_blend_mode)
 
+
+
+            if hasattr(target, 'inner_shadow'):
+                context = ClipContext(context.base_shape, target.inner_shadow, None)
+
+
+
+
         if layer._info.clipping and self._clip_group:
             self._clip_group.add(target)
 
@@ -86,15 +111,16 @@ class LayerConverter(object):
         elif layer._info.clipping:
             # Convert the last target to a clipping mask
             last_stroke = None
+            """
             last_target = self._current_group.elements[-1]
             if 'vector-stroke' in last_target.attribs.get(
                     'class', '').split():
                 last_stroke = self._current_group.elements.pop()
                 last_target = self._current_group.elements[-1]
-
+            """
 
             clip_path = self._dwg.defs.add(self._dwg.clipPath())
-            clip_path.add(self._dwg.use(last_target.get_iri()))
+            clip_path.add(self._dwg.use(context.base_shape.get_iri()))
             #self._clip_group['clip-path'] = clip_path.get_funciri()
 
             #mask = self._dwg.defs.add(self._dwg.mask())
@@ -125,9 +151,11 @@ class LayerConverter(object):
             self._clbl = blocks.get(b'clbl')
 
         if vector_stroke:
-            self._current_group.add(vector_stroke)
+            context = ClipContext(context.base_shape, context.inner_shadow, vector_stroke)
 
-        return target
+            #self._current_group.add(vector_stroke)
+
+        return context  # TODO refactor
 
     def _get_target(self, layer):
         #target = None
