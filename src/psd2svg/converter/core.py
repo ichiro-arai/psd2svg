@@ -17,9 +17,13 @@ class LayerConverter(object):
 
     def _add_group(self, layers):
         for layer in reversed(layers):
-            self._add_layer(layer)
+            target = self._add_layer(layer)
             for clip in reversed(layer.clip_layers):
                 self._add_layer(clip)
+            #if layer.clip_layers and self._clip_group:
+            #    clip_path = self._dwg.defs.add(self._dwg.clipPath())
+            #    clip_path.add(self._dwg.use(target.get_iri()))
+            #    self._clip_group['clip-path'] = clip_path.get_funciri()
 
     def _add_layer(self, layer):
         target = self._get_target(layer)
@@ -31,11 +35,17 @@ class LayerConverter(object):
         effects = self._get_effects(layer)
         vector_stroke = self._get_vector_stroke(layer, target)
 
-        logger.debug('{} {} {}'.format(layer.name, target, mask))
+        #logger.debug('{} {} {}'.format(layer.name, target, mask))
 
         if mask:
             target['mask'] = mask.get_funciri()
-            target['fill'] = 'white'
+
+
+
+
+            #print(target['mask'])
+
+
 
         # Blending options.
         if not layer._info.flags.visible:
@@ -81,11 +91,18 @@ class LayerConverter(object):
                     'class', '').split():
                 last_stroke = self._current_group.elements.pop()
                 last_target = self._current_group.elements[-1]
-            mask = self._dwg.defs.add(self._dwg.mask())
-            mask_bbox = layer.bbox
-            mask.add(self._dwg.use(last_target.get_iri()))
-            mask['color-interpolation'] = 'sRGB'
-            self._clip_group = self._dwg.g(mask=mask.get_funciri())
+
+
+            clip_path = self._dwg.defs.add(self._dwg.clipPath())
+            clip_path.add(self._dwg.use(last_target.get_iri()))
+            #self._clip_group['clip-path'] = clip_path.get_funciri()
+
+            #mask = self._dwg.defs.add(self._dwg.mask())
+            #mask.add(self._dwg.use(last_target.get_iri()))
+            #mask['color-interpolation'] = 'sRGB'
+            #mask=mask.get_funciri()
+
+            self._clip_group = self._dwg.g(clip_path=clip_path.get_funciri())
             self._clip_group['class'] = 'clipping-mask'
             self._current_group.add(self._clip_group)
             self._clip_group.add(target)
@@ -110,6 +127,8 @@ class LayerConverter(object):
         if vector_stroke:
             self._current_group.add(vector_stroke)
 
+        return target
+
     def _get_target(self, layer):
         #target = None
         if isinstance(layer, psd_tools.Group):
@@ -133,6 +152,7 @@ class LayerConverter(object):
             target.set_desc(title=safe_utf8(layer.name))
         elif isinstance(layer, _VisibleLayer):
             if not (layer.bbox.width > 0 and layer.bbox.height > 0):
+                logger.warning('invalid bbox {} - '.format(layer))
                 logger.warning('invalid bbox {}'.format(layer.bbox))
 
             # Regular pixel layer.

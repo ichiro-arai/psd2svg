@@ -73,6 +73,14 @@ class ShapeConverter(object):
             mask.add(self._dwg.path(self._generate_path(vsms), fill='black'))
             target['stroke-width'] = stroke_width * 2
             target['mask'] = mask.get_funciri()
+
+
+
+
+            #print(target['mask'])
+
+
+
         else:
             target['stroke-width'] = stroke_width
 
