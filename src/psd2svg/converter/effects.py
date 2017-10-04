@@ -382,7 +382,7 @@ class EffectsConverter(object):
             if key in blocks:
                 items = dict(blocks[key].data.items)
                 return self._get_color_in_item(items)
-        return 'white'
+        return 'none'
 
     def _make_pattern(self, items, insert=(0, 0)):
         pattern_id = dict(items[b'Ptrn'].items)[b'Idnt'].value
